@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPS TOPIK Vocabulary Quiz</title>
+    <script src="lessons.js"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #000000; 
+            color: #e0e0e0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+        }
+        .container { 
+            background: #1e1e1e; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(255,255,255,0.05); 
+            width: 100%; 
+            max-width: 500px; 
+            text-align: center; 
+        }
+        h1, h2, h3 { color: #ffffff; }
+        .hidden { display: none; }
+        input[type="number"] { 
+            width: 90%; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border: 1px solid #444; 
+            border-radius: 6px; 
+            font-size: 16px; 
+            background-color: #2c2c2c; 
+            color: #ffffff; 
+            text-align: center;
+        }
+        
+        /* Grid layout for the new lesson buttons */
+        #lesson-buttons-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* 2 columns */
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button { 
+            background-color: #3498db; 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            transition: background 0.3s, transform 0.1s; 
+            width: 100%; 
+        }
+        button:hover { background-color: #2980b9; }
+        button:active { transform: scale(0.98); }
+        
+        /* Specific styles for different button types */
+        .lesson-btn { background-color: #2c3e50; border: 1px solid #4dabf7; color: #4dabf7; font-weight: bold; }
+        .lesson-btn:hover { background-color: #4dabf7; color: #000; }
+        
+        .option-btn { 
+            background-color: #2c2c2c; 
+            color: #e0e0e0; 
+            border: 2px solid #555; 
+            margin-bottom: 10px;
+        }
+        .option-btn:hover { background-color: #444; }
+        
+        #timer { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #ff6b6b; 
+            margin-bottom: 20px; 
+            background: #2a1111;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #5c2b2b;
+            display: inline-block;
+            min-width: 100px;
+        }
+        .question-word { 
+            font-size: 40px; 
+            font-weight: bold; 
+            margin: 20px 0; 
+            color: #4dabf7; 
+        }
+        #wrong-answers-list { 
+            text-align: left; 
+            background: #2a1111; 
+            padding: 15px; 
+            border-radius: 6px; 
+            max-height: 250px; 
+            overflow-y: auto; 
+            margin-bottom: 20px; 
+            border: 1px solid #5c2b2b; 
+        }
+        .wrong-item { 
+            margin-bottom: 10px; 
+            border-bottom: 1px solid #4a2222; 
+            padding-bottom: 5px; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Main Menu -->
+    <div id="menu-screen">
+        <h1>Korean Quiz Setup</h1>
+        
+        <p>Time per question (Seconds):</p>
+        <input type="number" id="time-limit" value="10" min="1">
+        
+        <p style="margin-top: 20px; color: #aaa;">Select a Lesson to Start:</p>
+        <div id="lesson-buttons-container">
+            <!-- Lesson buttons injected by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quiz-screen" class="hidden">
+        <div id="timer">10s</div>
+        <p>Question <span id="current-q-num">1</span> / <span id="total-q-num">10</span></p>
+        <div class="question-word" id="korean-word">Word</div>
+        <div id="options-container"></div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="result-screen" class="hidden">
+        <h1>Quiz Complete!</h1>
+        <h2 id="score-display">Score: 0 / 100</h2>
+        <h3>Review Mistakes:</h3>
+        <div id="wrong-answers-list"></div>
+        <button onclick="redoQuiz()" style="margin-bottom: 10px;">Redo with Shuffled Answers</button>
+        <button onclick="goToMenu()" style="background-color: #555;">Main Menu</button>
+    </div>
+</div>
+
+<script>
+    let vocabularyData = [];
+    let currentQuestions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let wrongAnswers = [];
+    let timerInterval;
+    let secondsRemaining = 0;
+    let timePerQuestion = 10;
+    let activeLesson = "";
+
+    // Load Buttons when page opens
+    window.onload = function() {
+        const btnContainer = document.getElementById('lesson-buttons-container');
+        for (const lessonName in lessonData) {
+            let btn = document.createElement('button');
+            btn.className = 'lesson-btn';
+            btn.innerText = lessonName;
+            // Clicking the button starts that specific lesson immediately
+            btn.onclick = () => startApp(lessonName);
+            btnContainer.appendChild(btn);
+        }
+    };
+
+    function startApp(lessonName) {
+        activeLesson = lessonName;
+        timePerQuestion = parseInt(document.getElementById('time-limit').value);
+        
+        const rawTextData = lessonData[lessonName];
+        parseTextData(rawTextData);
+
+        if (vocabularyData.length >= 4) {
+            initQuiz();
+        } else {
+            alert("This lesson needs at least 4 words to generate options.");
+        }
+    }
+
+    function parseTextData(text) {
+        vocabularyData = [];
+        const lines = text.split('\n');
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const separator = line.includes('\t') ? '\t' : ',';
+                const parts = line.split(separator);
+                
+                if (parts.length >= 2) {
+                    vocabularyData.push({
+                        kr: parts[0].trim(),
+                        en: parts[1].trim()
+                    });
+                }
+            }
+        }
+    }
+
+    function initQuiz() {
+        currentQuestions = [...vocabularyData].sort(() => Math.random() - 0.5);
+        currentQuestionIndex = 0;
+        score = 0;
+        wrongAnswers = [];
+
+        document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('quiz-screen').classList.remove('hidden');
+
+        document.getElementById('total-q-num').innerText = currentQuestions.length;
+        
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        if (currentQuestionIndex >= currentQuestions.length) {
+            endQuiz();
+            return;
+        }
+
+        const currentQ = currentQuestions[currentQuestionIndex];
+        document.getElementById('current-q-num').innerText = currentQuestionIndex + 1;
+        document.getElementById('korean-word').innerText = currentQ.kr;
+
+        let options = [currentQ.en];
+        while (options.length < 4) {
+            const randomWord = vocabularyData[Math.floor(Math.random() * vocabularyData.length)].en;
+            if (!options.includes(randomWord)) {
+                options.push(randomWord);
+            }
+        }
+        
+        options = options.sort(() => Math.random() - 0.5);
+
+        const optionsContainer = document.getElementById('options-container');
+        optionsContainer.innerHTML = '';
+        
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(opt, currentQ);
+            optionsContainer.appendChild(btn);
+        });
+
+        // Reset and start the timer for THIS specific question
+        startTimer();
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        secondsRemaining = timePerQuestion;
+        updateTimerDisplay();
+        
+        timerInterval = setInterval(() => {
+            secondsRemaining--;
+            updateTimerDisplay();
+            
+            if (secondsRemaining <= 0) {
+                clearInterval(timerInterval);
+                handleTimeOut();
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        document.getElementById('timer').innerText = secondsRemaining + 's';
+    }
+
+    function handleTimeOut() {
+        const currentQ = currentQuestions[currentQuestionIndex];
+        wrongAnswers.push({ 
+            word: currentQ.kr, 
+            selected: "Time's Up!", 
+            correct: currentQ.en 
+        });
+        currentQuestionIndex++;
+        loadQuestion();
+    }
+
+    function checkAnswer(selected, currentQ) {
+        clearInterval(timerInterval); // Stop the timer the moment they click
+        
+        if (selected === currentQ.en) {
+            score++;
+        } else {
+            wrongAnswers.push({ word: currentQ.kr, selected: selected, correct: currentQ.en });
+        }
+        currentQuestionIndex++;
+        loadQuestion();
+    }
+
+    function endQuiz() {
+        clearInterval(timerInterval);
+        document.getElementById('quiz-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.remove('hidden');
+
+        const percentage = Math.round((score / currentQuestions.length) * 100);
+        document.getElementById('score-display').innerText = `Score: ${percentage}% (${score}/${currentQuestions.length})`;
+
+        const wrongList = document.getElementById('wrong-answers-list');
+        wrongList.innerHTML = '';
+        if (wrongAnswers.length === 0) {
+            wrongList.innerHTML = '<p style="color: #51cf66;">Perfect! No mistakes.</p>';
+        } else {
+            wrongAnswers.forEach(item => {
+                wrongList.innerHTML += `
+                    <div class="wrong-item">
+                        <strong>${item.word}</strong><br>
+                        <span style="color: #ff6b6b;">You chose: ${item.selected}</span><br>
+                        <span style="color: #51cf66;">Correct: ${item.correct}</span>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    function redoQuiz() {
+        initQuiz();
+    }
+
+    function goToMenu() {
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('menu-screen').classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
