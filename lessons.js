@@ -148,4 +148,5 @@ const lessonData = {
 안전하다	to be safe
 익숙해지다	to familier
    `,
+    
 };
