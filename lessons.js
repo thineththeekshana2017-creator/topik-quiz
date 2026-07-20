@@ -119,7 +119,7 @@ const lessonData = {
 11월 (십일월)	November
 12월 (십이월)	December
 이번 달	this month
-    `
+    `,
 "Lesson 31*": `
 복장	attire/clothing
 과	and 
@@ -146,5 +146,5 @@ const lessonData = {
 작업하다	to work
 안전하다	to be safe
 익숙해지다	to familier
-   `
+   `,
 };
