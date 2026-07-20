@@ -120,7 +120,8 @@ const lessonData = {
 12월 (십이월)	December
 이번 달	this month
     `,
-"Lesson 31*": `
+    
+    "Lesson 31*": `
 복장	attire/clothing
 과	and 
 근무	work
