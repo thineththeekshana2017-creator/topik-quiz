@@ -146,7 +146,7 @@ const lessonData = {
 그렇다	to be like that
 작업하다	to work
 안전하다	to be safe
-익숙해지다	to familier
+익숙해지다	to familiegr
    `,
     
 };
