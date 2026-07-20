@@ -120,4 +120,31 @@ const lessonData = {
 12월 (십이월)	December
 이번 달	this month
     `
+"Lesson 31*": `
+복장	attire/clothing
+과	and 
+근무	work
+태도	attitude
+관련	related
+어휘	vocabulary
+작업복	work cloths
+유니폼	uniform
+정장	foraml wear
+양복	business suit
+갈아입다	to change cloth
+벗다	to take off cloths
+단추를 잠그다	to button up
+단추를 풀다	to unbutton
+지퍼를 올리다	to zip up
+지퍼를 내리다	to unzip
+넥타이를 매다	to tie a tie
+넥타이를 풀다	to untie a tie
+단정하다	to be neat
+새	new
+예전	old
+그렇다	to be like that
+작업하다	to work
+안전하다	to be safe
+익숙해지다	to familier
+   `
 };
