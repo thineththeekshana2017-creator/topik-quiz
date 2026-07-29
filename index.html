@@ -27,7 +27,9 @@
         }
         h1, h2, h3 { color: #ffffff; }
         .hidden { display: none; }
-        input[type="number"] { 
+        
+        /* Updated Input Style to handle both numbers and text (for the code) */
+        input[type="number"], input[type="text"] { 
             width: 90%; 
             padding: 10px; 
             margin: 10px 0; 
@@ -39,10 +41,9 @@
             text-align: center;
         }
         
-        /* Grid layout for the new lesson buttons */
         #lesson-buttons-container {
             display: grid;
-            grid-template-columns: 1fr 1fr; /* 2 columns */
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
             margin-top: 20px;
         }
@@ -61,7 +62,6 @@
         button:hover { background-color: #2980b9; }
         button:active { transform: scale(0.98); }
         
-        /* Specific styles for different button types */
         .lesson-btn { background-color: #2c3e50; border: 1px solid #4dabf7; color: #4dabf7; font-weight: bold; }
         .lesson-btn:hover { background-color: #4dabf7; color: #000; }
         
@@ -111,8 +111,18 @@
 <body>
 
 <div class="container">
-    <!-- Main Menu -->
-    <div id="menu-screen">
+
+    <!-- 1. NEW LOGIN SCREEN -->
+    <div id="login-screen">
+        <h1>Premium Access</h1>
+        <p>Please enter your access code:</p>
+        <input type="text" id="access-code" placeholder="e.g., EPS-001">
+        <button id="login-btn" style="margin-top: 15px;">Log In</button>
+        <p id="error-message" style="color: #ff6b6b; margin-top: 15px;"></p>
+    </div>
+
+    <!-- 2. MAIN MENU (Now hidden by default) -->
+    <div id="menu-screen" class="hidden">
         <h1>Korean Quiz Setup</h1>
         
         <p>Time per question (Seconds):</p>
@@ -122,9 +132,11 @@
         <div id="lesson-buttons-container">
             <!-- Lesson buttons injected by JavaScript -->
         </div>
+        <!-- Optional Logout Button -->
+        <button id="logout-btn" style="margin-top: 20px; background-color: #555;">Log Out</button>
     </div>
 
-    <!-- Quiz Screen -->
+    <!-- 3. QUIZ SCREEN -->
     <div id="quiz-screen" class="hidden">
         <div id="timer">10s</div>
         <p>Question <span id="current-q-num">1</span> / <span id="total-q-num">10</span></p>
@@ -132,7 +144,7 @@
         <div id="options-container"></div>
     </div>
 
-    <!-- Results Screen -->
+    <!-- 4. RESULTS SCREEN -->
     <div id="result-screen" class="hidden">
         <h1>Quiz Complete!</h1>
         <h2 id="score-display">Score: 0 / 100</h2>
@@ -144,6 +156,53 @@
 </div>
 
 <script>
+    // --- AUTHENTICATION LOGIC ---
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzZSIvjLq7XhtRbZ_D2MTVRCtSlFoAqLYpXYGFIlRx4-90xuK9pODN1QoDy3_X0hat/exec";
+    
+    const loginBtn = document.getElementById("login-btn");
+    const codeInput = document.getElementById("access-code");
+    const errorMsg = document.getElementById("error-message");
+    const logoutBtn = document.getElementById("logout-btn");
+    
+    loginBtn.addEventListener("click", () => {
+        const code = codeInput.value.trim();
+        if (!code) return;
+
+        loginBtn.innerText = "Checking...";
+        errorMsg.innerText = "";
+        
+        fetch(`${WEB_APP_URL}?code=${code}`)
+            .then(response => response.json())
+            .then(data => {
+                loginBtn.innerText = "Log In";
+                
+                if (data.status === "success") {
+                    // Save login state in browser memory
+                    localStorage.setItem("isQuizUnlocked", "true");
+                    
+                    document.getElementById("login-screen").classList.add("hidden");
+                    document.getElementById("menu-screen").classList.remove("hidden");
+                } else if (data.status === "used") {
+                    errorMsg.innerText = "This code has already been used on another device.";
+                } else {
+                    errorMsg.innerText = "Invalid code. Please try again.";
+                }
+            })
+            .catch(error => {
+                loginBtn.innerText = "Log In";
+                errorMsg.innerText = "Connection error. Try again.";
+            });
+    });
+
+    // Logout logic
+    logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem("isQuizUnlocked");
+        document.getElementById("menu-screen").classList.add("hidden");
+        document.getElementById("login-screen").classList.remove("hidden");
+        codeInput.value = "";
+    });
+
+    // --- QUIZ LOGIC ---
     let vocabularyData = [];
     let currentQuestions = [];
     let currentQuestionIndex = 0;
@@ -154,16 +213,22 @@
     let timePerQuestion = 10;
     let activeLesson = "";
 
-    // Load Buttons when page opens
+    // Load Buttons and Check Login when page opens
     window.onload = function() {
+        // 1. Generate lesson buttons
         const btnContainer = document.getElementById('lesson-buttons-container');
         for (const lessonName in lessonData) {
             let btn = document.createElement('button');
             btn.className = 'lesson-btn';
             btn.innerText = lessonName;
-            // Clicking the button starts that specific lesson immediately
             btn.onclick = () => startApp(lessonName);
             btnContainer.appendChild(btn);
+        }
+
+        // 2. Check if user already logged in previously
+        if (localStorage.getItem("isQuizUnlocked") === "true") {
+            document.getElementById("login-screen").classList.add("hidden");
+            document.getElementById("menu-screen").classList.remove("hidden");
         }
     };
 
@@ -247,7 +312,6 @@
             optionsContainer.appendChild(btn);
         });
 
-        // Reset and start the timer for THIS specific question
         startTimer();
     }
 
@@ -283,7 +347,7 @@
     }
 
     function checkAnswer(selected, currentQ) {
-        clearInterval(timerInterval); // Stop the timer the moment they click
+        clearInterval(timerInterval); 
         
         if (selected === currentQ.en) {
             score++;
@@ -328,7 +392,5 @@
         document.getElementById('menu-screen').classList.remove('hidden');
     }
 </script>
-    const WEB_APP_URL = https://script.google.com/macros/s/AKfycbzzZSIvjLq7XhtRbZ_D2MTVRCtSlFoAqLYpXYGFIlRx4-90xuK9pODN1QoDy3_X0hat/exec;
-
 </body>
 </html>
