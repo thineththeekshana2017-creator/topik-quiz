@@ -28,8 +28,7 @@
         h1, h2, h3 { color: #ffffff; }
         .hidden { display: none; }
         
-        /* Updated Input Style to handle both numbers and text (for the code) */
-        input[type="number"], input[type="text"] { 
+        input[type="number"], input[type="email"], input[type="password"] { 
             width: 90%; 
             padding: 10px; 
             margin: 10px 0; 
@@ -112,16 +111,17 @@
 
 <div class="container">
 
-    <!-- 1. NEW LOGIN SCREEN -->
+    <!-- 1. FIREBASE LOGIN SCREEN -->
     <div id="login-screen">
         <h1>Premium Access</h1>
-        <p>Please enter your access code:</p>
-        <input type="text" id="access-code" placeholder="e.g., EPS-001">
+        <p>Log in with your account details:</p>
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="password" placeholder="Password">
         <button id="login-btn" style="margin-top: 15px;">Log In</button>
         <p id="error-message" style="color: #ff6b6b; margin-top: 15px;"></p>
     </div>
 
-    <!-- 2. MAIN MENU (Now hidden by default) -->
+    <!-- 2. MAIN MENU (Hidden by default, shown by Firebase if logged in) -->
     <div id="menu-screen" class="hidden">
         <h1>Korean Quiz Setup</h1>
         
@@ -132,7 +132,6 @@
         <div id="lesson-buttons-container">
             <!-- Lesson buttons injected by JavaScript -->
         </div>
-        <!-- Optional Logout Button -->
         <button id="logout-btn" style="margin-top: 20px; background-color: #555;">Log Out</button>
     </div>
 
@@ -150,59 +149,92 @@
         <h2 id="score-display">Score: 0 / 100</h2>
         <h3>Review Mistakes:</h3>
         <div id="wrong-answers-list"></div>
-        <button onclick="redoQuiz()" style="margin-bottom: 10px;">Redo with Shuffled Answers</button>
-        <button onclick="goToMenu()" style="background-color: #555;">Main Menu</button>
+        <button onclick="window.redoQuiz()" style="margin-bottom: 10px;">Redo with Shuffled Answers</button>
+        <button onclick="window.goToMenu()" style="background-color: #555;">Main Menu</button>
     </div>
 </div>
 
-<script>
-    // --- AUTHENTICATION LOGIC ---
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzZSIvjLq7XhtRbZ_D2MTVRCtSlFoAqLYpXYGFIlRx4-90xuK9pODN1QoDy3_X0hat/exec";
-    
-    const loginBtn = document.getElementById("login-btn");
-    const codeInput = document.getElementById("access-code");
-    const errorMsg = document.getElementById("error-message");
-    const logoutBtn = document.getElementById("logout-btn");
-    
-    loginBtn.addEventListener("click", () => {
-        const code = codeInput.value.trim();
-        if (!code) return;
+<!-- Type changed to "module" to support Firebase CDN imports -->
+<script type="module">
+    // --- 1. FIREBASE SETUP & LOGIC ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        loginBtn.innerText = "Checking...";
+    // Your exact Firebase Config
+    const firebaseConfig = {
+        apiKey: "AIzaSyDlIFy_OLEMNZL0C1e9O3dBjbXeSvZovis",
+        authDomain: "koreanquiz-2cdc1.firebaseapp.com",
+        projectId: "koreanquiz-2cdc1",
+        storageBucket: "koreanquiz-2cdc1.firebasestorage.app",
+        messagingSenderId: "50411156746",
+        appId: "1:50411156746:web:30932c81ca1674304976f3",
+        measurementId: "G-XVMS5E0SBS"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Auth DOM Elements
+    const loginBtn = document.getElementById("login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const errorMsg = document.getElementById("error-message");
+    const loginScreen = document.getElementById("login-screen");
+    const menuScreen = document.getElementById("menu-screen");
+    const resultScreen = document.getElementById("result-screen");
+    const quizScreen = document.getElementById("quiz-screen");
+
+    // Login Action
+    loginBtn.addEventListener("click", () => {
         errorMsg.innerText = "";
+        loginBtn.innerText = "Authenticating...";
         
-        fetch(`${WEB_APP_URL}?code=${code}`)
-            .then(response => response.json())
-            .then(data => {
+        signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value)
+            .then(() => {
                 loginBtn.innerText = "Log In";
-                
-                if (data.status === "success") {
-                    // Save login state in browser memory
-                    localStorage.setItem("isQuizUnlocked", "true");
-                    
-                    document.getElementById("login-screen").classList.add("hidden");
-                    document.getElementById("menu-screen").classList.remove("hidden");
-                } else if (data.status === "used") {
-                    errorMsg.innerText = "This code has already been used on another device.";
-                } else {
-                    errorMsg.innerText = "Invalid code. Please try again.";
-                }
             })
             .catch(error => {
                 loginBtn.innerText = "Log In";
-                errorMsg.innerText = "Connection error. Try again.";
+                errorMsg.innerText = "Invalid email or password. Please try again.";
             });
     });
 
-    // Logout logic
+    // Logout Action
     logoutBtn.addEventListener("click", () => {
-        localStorage.removeItem("isQuizUnlocked");
-        document.getElementById("menu-screen").classList.add("hidden");
-        document.getElementById("login-screen").classList.remove("hidden");
-        codeInput.value = "";
+        signOut(auth).then(() => {
+            emailInput.value = "";
+            passwordInput.value = "";
+        });
     });
 
-    // --- QUIZ LOGIC ---
+    // The Security Gate - Listens for login/logout in real-time
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // Logged in securely
+            loginScreen.classList.add("hidden");
+            
+            // Generate lesson buttons if not already generated
+            generateLessonButtons();
+            
+            // Only show menu if they aren't currently taking a quiz
+            if (quizScreen.classList.contains("hidden") && resultScreen.classList.contains("hidden")) {
+                menuScreen.classList.remove("hidden");
+            }
+        } else {
+            // Logged out or account disabled by admin
+            menuScreen.classList.add("hidden");
+            quizScreen.classList.add("hidden");
+            resultScreen.classList.add("hidden");
+            loginScreen.classList.remove("hidden");
+            
+            // Stop quiz timer if it was running
+            clearInterval(timerInterval);
+        }
+    });
+
+    // --- 2. QUIZ LOGIC ---
     let vocabularyData = [];
     let currentQuestions = [];
     let currentQuestionIndex = 0;
@@ -213,10 +245,11 @@
     let timePerQuestion = 10;
     let activeLesson = "";
 
-    // Load Buttons and Check Login when page opens
-    window.onload = function() {
-        // 1. Generate lesson buttons
+    function generateLessonButtons() {
         const btnContainer = document.getElementById('lesson-buttons-container');
+        // Only generate once
+        if (btnContainer.innerHTML.trim() !== "") return;
+        
         for (const lessonName in lessonData) {
             let btn = document.createElement('button');
             btn.className = 'lesson-btn';
@@ -224,13 +257,7 @@
             btn.onclick = () => startApp(lessonName);
             btnContainer.appendChild(btn);
         }
-
-        // 2. Check if user already logged in previously
-        if (localStorage.getItem("isQuizUnlocked") === "true") {
-            document.getElementById("login-screen").classList.add("hidden");
-            document.getElementById("menu-screen").classList.remove("hidden");
-        }
-    };
+    }
 
     function startApp(lessonName) {
         activeLesson = lessonName;
@@ -391,6 +418,11 @@
         document.getElementById('result-screen').classList.add('hidden');
         document.getElementById('menu-screen').classList.remove('hidden');
     }
+
+    // Export inline HTML button handlers to the global window object
+    window.redoQuiz = redoQuiz;
+    window.goToMenu = goToMenu;
+
 </script>
 </body>
 </html>
