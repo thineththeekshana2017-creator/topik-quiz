@@ -247,15 +247,18 @@
 
     function generateLessonButtons() {
         const btnContainer = document.getElementById('lesson-buttons-container');
-        // Only generate once
-        if (btnContainer.innerHTML.trim() !== "") return;
         
+        // This instantly clears the HTML comment so the container is actually empty
+        btnContainer.innerHTML = ""; 
+        
+        // Generate the buttons from your EPS TOPIK lessons.js file
         for (const lessonName in lessonData) {
             let btn = document.createElement('button');
             btn.className = 'lesson-btn';
             btn.innerText = lessonName;
             btn.onclick = () => startApp(lessonName);
             btnContainer.appendChild(btn);
+        
         }
     }
 
