@@ -159,11 +159,15 @@
     // --- 1. FIREBASE SETUP & LOGIC ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    // NEW: Import the database functions
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     // Your exact Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDlIFy_OLEMNZL0C1e9O3dBjbXeSvZovis",
         authDomain: "koreanquiz-2cdc1.firebaseapp.com",
+        // PASTE YOUR COPIED DATABASE URL HERE:
+        databaseURL: "https://console.firebase.google.com/u/0/project/koreanquiz-2cdc1/database/koreanquiz-2cdc1-default-rtdb/data/~2F", 
         projectId: "koreanquiz-2cdc1",
         storageBucket: "koreanquiz-2cdc1.firebasestorage.app",
         messagingSenderId: "50411156746",
@@ -171,9 +175,10 @@
         measurementId: "G-XVMS5E0SBS"
     };
 
-    // Initialize Firebase
+    // Initialize Firebase Services
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getDatabase(app);
 
     // Auth DOM Elements
     const loginBtn = document.getElementById("login-btn");
@@ -209,27 +214,42 @@
         });
     });
 
-    // The Security Gate - Listens for login/logout in real-time
+    // The Security Gate & Multi-Device Blocker
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // Logged in securely
-            loginScreen.classList.add("hidden");
+            // 1. Generate a unique "Ticket ID" for this specific browser session
+            if (!sessionStorage.getItem("deviceTicket")) {
+                sessionStorage.setItem("deviceTicket", Date.now().toString() + Math.random().toString());
+            }
+            const myTicket = sessionStorage.getItem("deviceTicket");
             
-            // Generate lesson buttons if not already generated
+            // 2. Tell the Database this is the current active ticket
+            const userSessionRef = ref(db, 'users/' + user.uid + '/activeTicket');
+            set(userSessionRef, myTicket);
+
+            // 3. Listen to see if someone else logs in and changes the ticket
+            onValue(userSessionRef, (snapshot) => {
+                const dbTicket = snapshot.val();
+                if (dbTicket && dbTicket !== myTicket) {
+                    // The ticket changed! Someone logged in somewhere else.
+                    alert("This account was just used to log in from another device. You have been logged out to protect your account.");
+                    signOut(auth);
+                }
+            });
+
+            // Logged in securely - show the app
+            loginScreen.classList.add("hidden");
             generateLessonButtons();
             
-            // Only show menu if they aren't currently taking a quiz
             if (quizScreen.classList.contains("hidden") && resultScreen.classList.contains("hidden")) {
                 menuScreen.classList.remove("hidden");
             }
         } else {
-            // Logged out or account disabled by admin
+            // Logged out
             menuScreen.classList.add("hidden");
             quizScreen.classList.add("hidden");
             resultScreen.classList.add("hidden");
             loginScreen.classList.remove("hidden");
-            
-            // Stop quiz timer if it was running
             clearInterval(timerInterval);
         }
     });
@@ -247,25 +267,19 @@
 
     function generateLessonButtons() {
         const btnContainer = document.getElementById('lesson-buttons-container');
-        
-        // This instantly clears the HTML comment so the container is actually empty
         btnContainer.innerHTML = ""; 
-        
-        // Generate the buttons from your EPS TOPIK lessons.js file
         for (const lessonName in lessonData) {
             let btn = document.createElement('button');
             btn.className = 'lesson-btn';
             btn.innerText = lessonName;
             btn.onclick = () => startApp(lessonName);
             btnContainer.appendChild(btn);
-        
         }
     }
 
     function startApp(lessonName) {
         activeLesson = lessonName;
         timePerQuestion = parseInt(document.getElementById('time-limit').value);
-        
         const rawTextData = lessonData[lessonName];
         parseTextData(rawTextData);
 
@@ -279,18 +293,13 @@
     function parseTextData(text) {
         vocabularyData = [];
         const lines = text.split('\n');
-        
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             if (line) {
                 const separator = line.includes('\t') ? '\t' : ',';
                 const parts = line.split(separator);
-                
                 if (parts.length >= 2) {
-                    vocabularyData.push({
-                        kr: parts[0].trim(),
-                        en: parts[1].trim()
-                    });
+                    vocabularyData.push({ kr: parts[0].trim(), en: parts[1].trim() });
                 }
             }
         }
@@ -305,7 +314,6 @@
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('result-screen').classList.add('hidden');
         document.getElementById('quiz-screen').classList.remove('hidden');
-
         document.getElementById('total-q-num').innerText = currentQuestions.length;
         
         loadQuestion();
@@ -367,23 +375,15 @@
 
     function handleTimeOut() {
         const currentQ = currentQuestions[currentQuestionIndex];
-        wrongAnswers.push({ 
-            word: currentQ.kr, 
-            selected: "Time's Up!", 
-            correct: currentQ.en 
-        });
+        wrongAnswers.push({ word: currentQ.kr, selected: "Time's Up!", correct: currentQ.en });
         currentQuestionIndex++;
         loadQuestion();
     }
 
     function checkAnswer(selected, currentQ) {
         clearInterval(timerInterval); 
-        
-        if (selected === currentQ.en) {
-            score++;
-        } else {
-            wrongAnswers.push({ word: currentQ.kr, selected: selected, correct: currentQ.en });
-        }
+        if (selected === currentQ.en) { score++; } 
+        else { wrongAnswers.push({ word: currentQ.kr, selected: selected, correct: currentQ.en }); }
         currentQuestionIndex++;
         loadQuestion();
     }
@@ -413,16 +413,12 @@
         }
     }
 
-    function redoQuiz() {
-        initQuiz();
-    }
-
+    function redoQuiz() { initQuiz(); }
     function goToMenu() {
         document.getElementById('result-screen').classList.add('hidden');
         document.getElementById('menu-screen').classList.remove('hidden');
     }
 
-    // Export inline HTML button handlers to the global window object
     window.redoQuiz = redoQuiz;
     window.goToMenu = goToMenu;
 
